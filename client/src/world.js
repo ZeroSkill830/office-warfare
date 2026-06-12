@@ -246,6 +246,62 @@ export function createWorld(scene) {
   // Neon lungo il corridoio
   for (const z of [-18, -10, -2, 6, 14, 20]) addNeon(0, z, Math.PI / 2)
 
+  // ---------- Lavagne del corridoio ----------
+  function addBlackboard(cz, side, text) {
+    if (typeof document === 'undefined') return
+    const bW = 1.8, bH = 0.8
+    // cx: superficie interna del muro corridoio, sporgendo leggermente verso il centro
+    const cx = side * 3 - side * (T / 2 + 0.04)
+
+    // Canvas texture: sfondo lavagna verde scuro + testo gessetto
+    const canvas = document.createElement('canvas')
+    canvas.width = 512; canvas.height = 256
+    const ctx = canvas.getContext('2d')
+    ctx.fillStyle = '#264d2a'
+    ctx.fillRect(0, 0, 512, 256)
+    // cornice interna chiara
+    ctx.strokeStyle = 'rgba(180,200,160,0.35)'
+    ctx.lineWidth = 6
+    ctx.strokeRect(10, 10, 492, 236)
+    // testo con word wrap
+    ctx.fillStyle = 'rgba(232, 228, 205, 0.9)'
+    ctx.font = 'bold 30px Arial, sans-serif'
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    const words = text.split(' ')
+    const maxLineW = 460
+    const lines = []; let cur = ''
+    for (const w of words) {
+      const t = cur ? `${cur} ${w}` : w
+      if (ctx.measureText(t).width > maxLineW && cur) { lines.push(cur); cur = w }
+      else cur = t
+    }
+    if (cur) lines.push(cur)
+    const lineH = 52
+    const startY = 128 - ((lines.length - 1) * lineH) / 2
+    lines.forEach((l, i) => ctx.fillText(l, 256, startY + i * lineH))
+
+    // Cornice in legno scuro (stessa rotazione del piano, altrimenti la profondità va lungo Z)
+    const frame = new THREE.Mesh(
+      new THREE.BoxGeometry(bW + 0.14, bH + 0.14, 0.07),
+      new THREE.MeshLambertMaterial({ color: 0x4a3010 }),
+    )
+    frame.position.set(cx, 1.85, cz)
+    frame.rotation.y = -side * Math.PI / 2
+    scene.add(frame)
+
+    // Piano della lavagna (leggermente davanti alla cornice)
+    const board = new THREE.Mesh(
+      new THREE.PlaneGeometry(bW, bH),
+      new THREE.MeshLambertMaterial({ map: new THREE.CanvasTexture(canvas) }),
+    )
+    board.position.set(cx - side * 0.036, 1.85, cz)
+    board.rotation.y = -side * Math.PI / 2
+    scene.add(board)
+  }
+
+  addBlackboard(0, -1, 'Non dimenticarti di badgare')
+  addBlackboard(0,  1, 'Questo gioco è in beta, non rompere i coglioni')
+
   // ---------- Luci ----------
   scene.add(new THREE.HemisphereLight(0xcfe2ff, 0x4a4a42, 1.15))
   const ambient = new THREE.AmbientLight(0xffffff, 0.25)
