@@ -49,25 +49,16 @@ export class Minimap {
   }
 
   // pos = posizione del giocatore locale, yaw = direzione di vista,
-  // remotes = istanza di Remotes; opts = { myTeam, flags } per le modalità a squadre
-  update(pos, yaw, remotes, { myTeam = null, flags = null } = {}) {
+  // remotes = istanza di Remotes
+  update(pos, yaw, remotes) {
     const ctx = this.ctx
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
     ctx.drawImage(this.base, 0, 0)
 
-    // Bandiere CTF: quadrati colorati per squadra
-    if (flags) {
-      for (const f of flags.map.values()) {
-        const [x, y] = this._toPx(f.mesh.position.x, f.mesh.position.z)
-        ctx.fillStyle = f === flags.map.get('a') ? '#6fb3ff' : '#ff8a80'
-        ctx.fillRect(x - 3.5, y - 3.5, 7, 7)
-      }
-    }
-
-    // Altri giocatori vivi: compagni verdi, avversari rossi
+    // Altri giocatori vivi
     for (const a of remotes.map.values()) {
       if (!a.alive) continue
-      ctx.fillStyle = myTeam && a.team === myTeam ? '#4ade80' : '#ff5252'
+      ctx.fillStyle = '#ff5252'
       const [x, y] = this._toPx(a.group.position.x, a.group.position.z)
       ctx.beginPath()
       ctx.arc(x, y, 3.2, 0, Math.PI * 2)

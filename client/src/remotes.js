@@ -7,7 +7,6 @@
 import * as THREE from 'three'
 import { makeWeaponMesh } from './weapons.js'
 import { instantiate } from './models.js'
-import { TEAM_COLORS } from './flags.js'
 
 const FADE = 0.18
 
@@ -44,13 +43,17 @@ function makeNameplate(name) {
   return { sprite, draw }
 }
 
-// Passa alla clip indicata con crossfade; once = riproduci una volta e ferma
-function play(a, name, { once = false } = {}) {
+// Passa alla clip indicata con crossfade; once = riproduci una volta e ferma.
+// startAt/timeScale permettono di saltare le parti lente delle clip lunghe
+// (es. la rincorsa all'inizio di Jump).
+function play(a, name, { once = false, startAt = 0, timeScale = 1 } = {}) {
   if (a.current === name) return
   const next = a.actions[name]
   if (!next) return
   const prev = a.actions[a.current]
   next.reset()
+  next.time = startAt
+  next.timeScale = timeScale
   next.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, Infinity)
   next.clampWhenFinished = once
   next.fadeIn(FADE).play()
@@ -72,17 +75,6 @@ export class Remotes {
     const avatar = instantiate(info.char)
     if (avatar) group.add(avatar.root)
 
-    // Nelle modalità a squadre, anello colorato sotto i piedi
-    if (info.team) {
-      const ring = new THREE.Mesh(
-        new THREE.RingGeometry(0.42, 0.58, 28),
-        new THREE.MeshBasicMaterial({ color: TEAM_COLORS[info.team], transparent: true, opacity: 0.75 }),
-      )
-      ring.rotation.x = -Math.PI / 2
-      ring.position.y = 0.04
-      group.add(ring)
-    }
-
     const weaponHolder = new THREE.Group()
     weaponHolder.position.set(0.36, 1.15, -0.35)
     let weaponMesh = makeWeaponMesh(info.weapon || 'mouse')
@@ -100,7 +92,6 @@ export class Remotes {
     const a = {
       id: info.id,
       nick: info.nick,
-      team: info.team || null,
       group, avatar, weaponHolder, weaponMesh, plate,
       mixer: avatar?.mixer, actions: avatar?.actions || {}, hand: avatar?.hand,
       current: null,   // clip "di base" attiva (Idle/Run/Jump/Death)
@@ -170,17 +161,25 @@ export class Remotes {
     }
   }
 
-  // Sparo di un giocatore remoto: clip Shoot in overlay sul movimento
+  // Sparo di un giocatore remoto: la clip Shoot (1.2 s, accelerata a 2.6×)
+  // prende il pieno controllo per ~0.4 s — la clip di base viene abbassata,
+  // altrimenti il blending a pari peso rende lo sparo quasi invisibile.
+  // ⚠️ Niente fadeIn qui: fadeIn riparte SEMPRE da peso 0, e spammando colpi
+  // (base già spenta) ogni retrigger lascerebbe qualche frame senza nessuna
+  // clip attiva → flash di T-pose. Lo sparo entra a peso pieno, di colpo.
   onShot(id) {
     const a = this.map.get(id)
     if (!a || !a.alive) return
-    a.shootT = 0.45
     const act = a.actions.Shoot
-    if (act) {
-      act.reset()
-      act.setLoop(THREE.LoopOnce, 1)
-      act.fadeIn(0.06).play()
-    }
+    if (!act) return
+    a.shootT = 0.4
+    act.reset()
+    act.timeScale = 2.6
+    act.setLoop(THREE.LoopOnce, 1)
+    act.clampWhenFinished = true
+    act.setEffectiveWeight(1)
+    act.play()
+    a.actions[a.current]?.fadeOut(0.08)
   }
 
   update(dt) {
@@ -196,12 +195,6 @@ export class Remotes {
       a.mixer?.update(dt)
       if (!a.alive) continue
 
-      // Overlay di sparo: dissolve quando il timer scade
-      if (a.shootT > 0) {
-        a.shootT -= dt
-        if (a.shootT <= 0) a.actions.Shoot?.fadeOut(0.2)
-      }
-
       // Velocità stimata dal movimento interpolato → scelta della clip
       const vx = (a.group.position.x - a.prevPos.x) / Math.max(dt, 1e-4)
       const vz = (a.group.position.z - a.prevPos.z) / Math.max(dt, 1e-4)
@@ -209,8 +202,24 @@ export class Remotes {
       const speed = Math.hypot(vx, vz)
       const airborne = Math.abs(vy) > 1.2 || a.group.position.y > a.targetPos.y + 0.3
 
-      if (airborne) {
-        play(a, 'Jump', { once: true })
+      if (a.shootT > 0) {
+        // Sparo in corso: Shoot ha il controllo; al termine torna la clip di base.
+        // ⚠️ Un fadeOut completato DISABILITA l'azione (three.js): va riabilitata
+        // esplicitamente, altrimenti il fadeIn non ha effetto → T-pose.
+        a.shootT -= dt
+        if (a.shootT <= 0) {
+          a.actions.Shoot?.fadeOut(0.15)
+          const base = a.actions[a.current]
+          if (base) {
+            base.enabled = true
+            base.paused = false
+            base.fadeIn(0.15).play()
+          }
+        }
+      } else if (airborne) {
+        // La clip Jump (2.2 s) parte dalla fase di stacco, non dalla rincorsa:
+        // in un salto reale (~0.8 s) l'inizio della clip non si vedrebbe mai
+        play(a, 'Jump', { once: true, startAt: 0.55, timeScale: 1.35 })
       } else if (speed > 1.2) {
         play(a, 'Run')
         if (a.actions.Run) a.actions.Run.timeScale = THREE.MathUtils.clamp(speed / 6, 0.7, 1.6)
@@ -252,9 +261,5 @@ export class Remotes {
 
   nickOf(id) {
     return this.map.get(id)?.nick
-  }
-
-  teamOf(id) {
-    return this.map.get(id)?.team ?? null
   }
 }

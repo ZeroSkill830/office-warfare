@@ -16,16 +16,10 @@ Roadmap delle feature, divisa in fasi (vedi `How_it_works.md` per l'architettura
   - [x] Modelli migliorati (procedurali: cravatta, occhiali, cuffie, cappellino)
   - [x] Leaderboard kills persistente (`server/leaderboard.json` + `GET /leaderboard` + menu)
 - [x] Deploy online: repo GitHub + blueprint Render (`render.yaml`), URL same-origin in produzione
-- [x] **Fase 3 — Modalità di gioco**
-  - [x] Server ristrutturato in classe `Game` (una istanza = una modalità = una stanza Socket.io)
-  - [x] Ciclo di partita: limite punteggio + limite tempo, fine match con vincitore, intermission e restart
-  - [x] Team Deathmatch: squadre bilanciate, spawn per metà campo, fuoco amico bloccato, maglie colorate
-  - [x] Capture the Flag: bandiere 3D con basi, presa/drop/recupero/cattura, ritorno automatico (25 s)
-  - [x] Selezione modalità nel menu con conteggio giocatori per stanza (`GET /info`)
-  - [x] HUD: banner modalità + timer + punteggi squadra, overlay fine partita, scoreboard per team,
-        compagni/bandiere sulla mini-mappa
-- [x] **Fase 4 (parziale)** — le tre modalità SONO stanze parallele indipendenti; manca solo
-      la creazione dinamica di stanze private
+- [x] ~~Fase 3 — Modalità di gioco (DM/TDM/CTF, squadre, bandiere, timer, fine partita)~~
+      **costruita e poi RIMOSSA di proposito (12 giugno 2026)**: il gioco è tornato a un
+      **free roam unico** — tutti nella stessa stanza, senza tempo né vincitore.
+      Il codice delle modalità è recuperabile dalla history git se servirà.
 - [x] **Modelli custom dei giocatori** (giugno 2026)
   - [x] GLB per personaggio in `client/public/assets/players/<id>/player.glb`
         (clip Idle/Shoot/Jump/Death/Run); il server scansiona le cartelle (`GET /characters`)
@@ -33,15 +27,11 @@ Roadmap delle feature, divisa in fasi (vedi `How_it_works.md` per l'architettura
   - [x] Avatar remoti animati (corsa ∝ velocità, salto, sparo in overlay, morte a terra)
   - [x] Schermata di loading con barra di progresso e sfondo `assets/banner.png`
 - [x] **Menu a pagine** (giugno 2026): banner + "Entra in ufficio" → selezione
-      personaggio split-screen (anteprima a tutta altezza, frecce, nickname) →
-      scelta modalità. Per ora solo deathmatch abilitato (`ENABLED_MODES` in main.js)
+      personaggio split-screen (primo piano su `player-bg.png`, frecce, nickname) →
+      briefing (giocatori online, leaderboard, controlli, "Entra in partita")
+- [x] **Tema UI militare** (giugno 2026): verdi oliva, font stencil, HUD coerente
 
-## Fase 4 — Stanze dinamiche (se servirà)
-
-- [ ] Stanze private create dai giocatori (nome/codice partita), oltre alle 3 fisse per modalità
-- [ ] Valutare se serve davvero oltre l'uso con colleghi (le 3 stanze fisse bastano per ora)
-
-## Fase 5 — Lungo termine
+## Lungo termine
 
 - [ ] Sistema di progressione: livelli/XP da kill, abilità, personalizzazione
       (richiede identità persistente: account o nickname + storage; su Render serve un DB,

@@ -9,7 +9,6 @@ import { Projectiles } from './projectiles.js'
 import { Remotes } from './remotes.js'
 import { Pickups, labelOf } from './pickups.js'
 import { Minimap } from './minimap.js'
-import { Flags, TEAM_LABELS } from './flags.js'
 import { hud } from './hud.js'
 import { connect, serverUrl } from './net.js'
 import { audio } from './audio.js'
@@ -40,14 +39,10 @@ const player = new PlayerController(world.physics)
 const remotes = new Remotes(scene, { onStep: (pos) => audio.footstep(pos) })
 const pickups = new Pickups(scene, world.physics)
 const minimap = new Minimap(document.getElementById('minimap'), world.physics)
-const flags = new Flags(scene)
 
 // ---------- Stato di gioco ----------
 let net = null
 let myId = null
-let myTeam = null
-let gameMode = 'dm'
-let matchEnded = false
 let hp = 100
 let dead = false
 let deathUntil = 0
@@ -77,8 +72,6 @@ const projectiles = new Projectiles({
     return targets
   },
   onHitPlayer: ({ targetId, weapon, shotId, scale }) => {
-    // Fuoco amico disattivato: il server lo rifiuterebbe comunque
-    if (myTeam && targetId !== myId && remotes.teamOf(targetId) === myTeam) return
     net?.hit({ targetId, weapon, shotId, scale })
     if (targetId !== myId) {
       hud.hitmarker()
@@ -148,8 +141,8 @@ function tryPickup() {
 }
 
 // ---------- Rete ----------
-function startGame(nick, char, mode) {
-  net = connect(nick, char, mode, {
+function startGame(nick, char) {
+  net = connect(nick, char, {
     onError: () => {
       document.getElementById('menu').classList.remove('hidden')
       document.getElementById('menu-error').textContent =
@@ -158,22 +151,14 @@ function startGame(nick, char, mode) {
 
     onInit: (data) => {
       myId = data.id
-      myTeam = data.team || null
-      gameMode = data.mode
-      matchEnded = false
       const me = data.players.find(p => p.id === myId)
       player.setPosition(me.pos[0], me.pos[1], me.pos[2])
       hp = me.hp
       for (const p of data.players) if (p.id !== myId) remotes.add(p)
       pickups.init(data.pickups)
       for (const d of data.drops) pickups.addDrop(d)
-      flags.init(data.flags)
-      hud.setMode(data.modeLabel)
-      hud.setClock(data.timeLeft)
-      hud.setTeamScores(data.teamScores, myTeam)
       hud.setScores(data.scores, myId)
       hud.setHP(hp)
-      if (myTeam) hud.message(`Sei nella squadra dei ${TEAM_LABELS[myTeam]}`, 3500)
       hud.show()
       document.getElementById('menu').classList.add('hidden')
       renderer.domElement.requestPointerLock()
@@ -275,41 +260,6 @@ function startGame(nick, char, mode) {
     },
 
     onScores: (list) => hud.setScores(list, myId),
-    onTeamScores: (s) => hud.setTeamScores(s, myTeam),
-    onClock: ({ t }) => hud.setClock(t),
-
-    onFlag: (f) => {
-      flags.set(f)
-      if (f.state === 'carried' && f.carrier === myId) {
-        hud.message('🚩 Hai la bandiera! Portala alla tua base', 3000)
-        audio.pickup()
-      }
-    },
-    onFlagScored: ({ team, by, nick }) => {
-      hud.message(`🚩 ${by === myId ? 'Hai catturato' : nick + ' ha catturato'} la bandiera!`, 3000)
-      audio.pickup()
-    },
-
-    onMatchEnd: ({ winner }) => {
-      matchEnded = true
-      weapons.triggerDown = false
-      if (winner?.team) {
-        hud.matchEnd(`Vincono i ${TEAM_LABELS[winner.team]}!`, winner.team === 'a' ? '#6fb3ff' : '#ff8a80')
-      } else if (winner) {
-        hud.matchEnd(winner.id === myId ? '🏆 Hai vinto!' : `Vince ${winner.nick}!`, '#ffd54f')
-      } else {
-        hud.matchEnd('Pareggio!', '#fff')
-      }
-    },
-    onMatchStart: ({ timeLeft, teamScores, flags: flagList }) => {
-      matchEnded = false
-      hud.matchEndHide()
-      hud.setClock(timeLeft)
-      hud.setTeamScores(teamScores, myTeam)
-      pickups.resetAll()
-      flags.init(flagList)
-      hud.message('Nuova partita!', 2000)
-    },
   })
 }
 
@@ -367,32 +317,8 @@ async function boot() {
 }
 boot()
 
-// Selettore della modalità di gioco (per ora solo deathmatch)
-const MODE_LABELS = { dm: 'Deathmatch', tdm: 'Team Deathmatch', ctf: 'Capture the Flag' }
-const ENABLED_MODES = ['dm']
-let selectedMode = localStorage.getItem('ow-mode')
-if (!ENABLED_MODES.includes(selectedMode)) selectedMode = 'dm'
-const modesEl = document.getElementById('modes')
-for (const [id, label] of Object.entries(MODE_LABELS)) {
-  const card = document.createElement('div')
-  const enabled = ENABLED_MODES.includes(id)
-  card.className = 'mode-card' + (enabled ? '' : ' disabled')
-  card.dataset.mode = id
-  card.innerHTML = enabled
-    ? `${label}<span class="mode-count" id="mode-count-${id}"></span>`
-    : `${label}<span class="mode-count">in arrivo</span>`
-  if (enabled) card.addEventListener('click', () => selectMode(id))
-  modesEl.appendChild(card)
-}
-function selectMode(id) {
-  selectedMode = id
-  localStorage.setItem('ow-mode', id)
-  for (const c of modesEl.children) c.classList.toggle('selected', c.dataset.mode === id)
-}
-selectMode(selectedMode)
-
-// Navigazione tra le due pagine del menu
-function goToModes() {
+// Navigazione tra le due pagine del menu (personaggio → briefing)
+function goToBriefing() {
   const nick = nickInput.value.trim()
   if (!nick) {
     document.getElementById('char-error').textContent = 'Inserisci un nickname'
@@ -403,18 +329,16 @@ function goToModes() {
   screenChar.classList.add('hidden')
   screenMode.classList.remove('hidden')
 }
-document.getElementById('to-modes').addEventListener('click', goToModes)
+document.getElementById('to-modes').addEventListener('click', goToBriefing)
 document.getElementById('back-to-char').addEventListener('click', () => {
   screenMode.classList.add('hidden')
   screenChar.classList.remove('hidden')
 })
 fetch(`${serverUrl()}/info`)
   .then(r => r.json())
-  .then(info => {
-    for (const [id, g] of Object.entries(info)) {
-      const el = document.getElementById(`mode-count-${id}`)
-      if (el) el.textContent = g.players === 1 ? '1 in gioco' : `${g.players} in gioco`
-    }
+  .then(({ players }) => {
+    document.getElementById('online-count').textContent =
+      players === 1 ? '1 collega in ufficio' : `${players} colleghi in ufficio`
   })
   .catch(() => {})
 
@@ -438,9 +362,9 @@ document.getElementById('play').addEventListener('click', () => {
   const nick = nickInput.value.trim()
   if (!nick) return
   document.getElementById('menu-error').textContent = ''
-  startGame(nick, selectedChar, selectedMode)
+  startGame(nick, selectedChar)
 })
-nickInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') goToModes() })
+nickInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') goToBriefing() })
 
 // ---------- Loop di gioco ----------
 let lastT = performance.now()
@@ -461,12 +385,11 @@ function loop(now) {
     camera.position.set(player.position.x, player.eyeY, player.position.z)
     camera.quaternion.setFromEuler(new THREE.Euler(pitch, yaw, 0, 'YXZ'))
 
-    weapons.update(dt, locked && !dead && !matchEnded)
+    weapons.update(dt, locked && !dead)
     projectiles.update(dt)
     remotes.update(dt)
     pickups.update(dt)
-    flags.update(dt, remotes, myId, player.position)
-    minimap.update(player.position, yaw, remotes, { myTeam, flags: gameMode === 'ctf' ? flags : null })
+    minimap.update(player.position, yaw, remotes)
     audio.updateListener(player.position.x, player.eyeY, player.position.z, yaw)
 
     // Passi del giocatore locale

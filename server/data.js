@@ -9,19 +9,6 @@ export const WEAPONS = {
   pen:      { damage: 40, pellets: 1 },
 }
 
-// Modalità di gioco: ogni modalità è una stanza separata sul server.
-export const MODES = {
-  dm:  { label: 'Deathmatch',       scoreLimit: 20, timeLimit: 480 },
-  tdm: { label: 'Team Deathmatch',  scoreLimit: 30, timeLimit: 480 },
-  ctf: { label: 'Capture the Flag', scoreLimit: 3,  timeLimit: 600 },
-}
-
-// CTF: basi delle bandiere ai due capi del corridoio.
-// Lato squadra A = metà z<0, squadra B = metà z>0.
-export const FLAG_BASES = { a: [0, 0, -20.5], b: [0, 0, 20.5] }
-export const FLAG_RADIUS = 1.8
-export const FLAG_RETURN_MS = 25000
-
 export const WEAPON_RESPAWN_MS = 30000
 export const ITEM_RESPAWN_MS = 15000
 export const RESPAWN_DELAY_MS = 3000

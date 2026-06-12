@@ -53,41 +53,14 @@ export const hud = {
   },
 
   setScores(list, myId) {
-    const sorted = [...list].sort((a, b) =>
-      (a.team && b.team && a.team !== b.team) ? a.team.localeCompare(b.team) : b.kills - a.kills || a.deaths - b.deaths)
+    const sorted = [...list].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths)
     $('score-rows').innerHTML = sorted.map(s =>
-      `<tr class="${s.id === myId ? 'me' : ''}${s.team ? ' team-' + s.team : ''}"><td>${escapeHtml(s.nick)}</td><td>${s.kills}</td><td>${s.deaths}</td></tr>`
+      `<tr class="${s.id === myId ? 'me' : ''}"><td>${escapeHtml(s.nick)}</td><td>${s.kills}</td><td>${s.deaths}</td></tr>`
     ).join('')
-    const byKills = [...list].sort((a, b) => b.kills - a.kills || a.deaths - b.deaths)
-    const me = byKills.find(s => s.id === myId)
-    const rank = byKills.findIndex(s => s.id === myId) + 1
+    const me = sorted.find(s => s.id === myId)
+    const rank = sorted.findIndex(s => s.id === myId) + 1
     if (me) $('score-mini').textContent = `#${rank} — ${me.kills} uccisioni / ${me.deaths} morti`
   },
-
-  setMode(label) { $('match-mode').textContent = label },
-
-  setClock(seconds) {
-    const m = Math.floor(seconds / 60)
-    const s = Math.floor(seconds % 60)
-    $('match-clock').textContent = `${m}:${String(s).padStart(2, '0')}`
-  },
-
-  setTeamScores(scores, myTeam) {
-    const el = $('team-scores')
-    if (!scores || !myTeam) { el.classList.add('hidden'); return }
-    el.classList.remove('hidden')
-    el.innerHTML =
-      `<b class="team-a">Blu ${scores.a}</b> — <b class="team-b">${scores.b} Rossi</b>` +
-      (myTeam ? ` <span style="color:#8aa0b8">(sei ${myTeam === 'a' ? 'Blu' : 'Rosso'})</span>` : '')
-  },
-
-  matchEnd(text, color) {
-    $('match-winner').textContent = text
-    $('match-winner').style.color = color || '#fff'
-    $('match-end').classList.remove('hidden')
-  },
-
-  matchEndHide() { $('match-end').classList.add('hidden') },
 
   toggleScoreboard(show) { $('scoreboard').classList.toggle('hidden', !show) },
 
