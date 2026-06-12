@@ -11,16 +11,17 @@ export function serverUrl() {
     : location.origin
 }
 
-export function connect(nick, char, handlers) {
+export function connect(nick, char, mode, handlers) {
   const socket = io(serverUrl(), { transports: ['websocket', 'polling'] })
 
-  socket.on('connect', () => socket.emit('join', { nick, char }))
+  socket.on('connect', () => socket.emit('join', { nick, char, mode }))
   socket.on('connect_error', (err) => handlers.onError?.(err))
 
   for (const ev of [
     'init', 'playerJoined', 'playerLeft', 'states', 'shot',
     'damaged', 'death', 'respawned', 'pickupTaken', 'pickupRespawned',
     'dropSpawned', 'dropTaken', 'scores',
+    'teamScores', 'clock', 'matchEnd', 'matchStart', 'flag', 'flagScored',
   ]) {
     socket.on(ev, (data) => handlers['on' + ev[0].toUpperCase() + ev.slice(1)]?.(data))
   }

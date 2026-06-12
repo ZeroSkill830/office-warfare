@@ -7,24 +7,52 @@
   <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
-  <!-- Schermata iniziale -->
-  <div id="menu">
-    <div class="menu-box">
+  <!-- Schermata di caricamento asset -->
+  <div id="loading">
+    <div class="loading-box">
       <h1>OFFICE&nbsp;WARFARE</h1>
-      <p class="subtitle">Deathmatch in ufficio &mdash; tutti contro tutti</p>
-      <input id="nick" type="text" maxlength="16" placeholder="Il tuo nickname" autocomplete="off" />
-      <div id="chars"></div>
-      <p id="char-desc"></p>
-      <button id="play">ENTRA IN PARTITA</button>
-      <p id="menu-error" class="error"></p>
-      <div class="controls-help">
-        <b>Controlli</b><br/>
-        WASD muovi &middot; Mouse mira &middot; Click sx spara &middot; R ricarica<br/>
-        Spazio salta &middot; E raccogli &middot; 1/2 cambia arma &middot; Tab classifica
+      <div id="load-bar"><div id="load-fill"></div></div>
+      <div id="load-text">Carico gli asset...</div>
+      <button id="enter-office" class="hidden">ENTRA IN UFFICIO</button>
+    </div>
+  </div>
+
+  <!-- Menu (due pagine: personaggio → modalità) -->
+  <div id="menu">
+    <!-- Pagina 1: selezione del personaggio -->
+    <div id="screen-char">
+      <canvas id="char-preview"></canvas>
+      <div class="char-panel">
+        <h2>SCEGLI IL PERSONAGGIO</h2>
+        <div id="char-nav">
+          <button id="char-prev" aria-label="precedente">&#8249;</button>
+          <span id="char-name"></span>
+          <button id="char-next" aria-label="successivo">&#8250;</button>
+        </div>
+        <input id="nick" type="text" maxlength="16" placeholder="Il tuo nickname" autocomplete="off" />
+        <button id="to-modes">AVANTI</button>
+        <p id="char-error" class="error"></p>
       </div>
-      <div id="menu-leaderboard" class="hidden">
-        <b>🏆 Migliori di sempre</b>
-        <ol id="menu-lb-rows"></ol>
+    </div>
+
+    <!-- Pagina 2: scelta della modalità -->
+    <div id="screen-mode" class="hidden">
+      <div class="menu-box">
+        <h1>OFFICE&nbsp;WARFARE</h1>
+        <p class="subtitle">Scegli la modalità</p>
+        <div id="modes"></div>
+        <button id="play">ENTRA IN PARTITA</button>
+        <button id="back-to-char">&#8249; cambia personaggio</button>
+        <p id="menu-error" class="error"></p>
+        <div class="controls-help">
+          <b>Controlli</b><br/>
+          WASD muovi &middot; Mouse mira &middot; Click sx spara &middot; R ricarica<br/>
+          Spazio salta &middot; E raccogli &middot; 1/2 cambia arma &middot; Tab classifica
+        </div>
+        <div id="menu-leaderboard" class="hidden">
+          <b>🏆 Migliori di sempre</b>
+          <ol id="menu-lb-rows"></ol>
+        </div>
       </div>
     </div>
   </div>
@@ -33,6 +61,17 @@
   <div id="hud" class="hidden">
     <div id="crosshair">+</div>
     <div id="hitmarker">&#10005;</div>
+
+    <div id="match-banner">
+      <span id="match-mode"></span>
+      <span id="team-scores" class="hidden"></span>
+      <span id="match-clock"></span>
+    </div>
+
+    <div id="match-end" class="hidden">
+      <div id="match-winner"></div>
+      <div id="match-next">Nuova partita tra pochi secondi...</div>
+    </div>
 
     <div id="bottom-left">
       <div id="hp-bar"><div id="hp-fill"></div></div>

@@ -9,10 +9,14 @@ import { Projectiles } from './projectiles.js'
 import { Remotes } from './remotes.js'
 import { Pickups, labelOf } from './pickups.js'
 import { Minimap } from './minimap.js'
+import { Flags, TEAM_LABELS } from './flags.js'
 import { hud } from './hud.js'
 import { connect, serverUrl } from './net.js'
 import { audio } from './audio.js'
-import { CHARACTERS, DEFAULT_CHARACTER, isCharacter } from './characters.js'
+import {
+  fetchCharacterList, loadCharacters, characters, isCharacter, defaultCharacter,
+  labelOf as charLabel, CharacterPreview,
+} from './models.js'
 
 // ---------- Rendering di base ----------
 const renderer = new THREE.WebGLRenderer({ antialias: true })
@@ -36,10 +40,14 @@ const player = new PlayerController(world.physics)
 const remotes = new Remotes(scene, { onStep: (pos) => audio.footstep(pos) })
 const pickups = new Pickups(scene, world.physics)
 const minimap = new Minimap(document.getElementById('minimap'), world.physics)
+const flags = new Flags(scene)
 
 // ---------- Stato di gioco ----------
 let net = null
 let myId = null
+let myTeam = null
+let gameMode = 'dm'
+let matchEnded = false
 let hp = 100
 let dead = false
 let deathUntil = 0
@@ -69,6 +77,8 @@ const projectiles = new Projectiles({
     return targets
   },
   onHitPlayer: ({ targetId, weapon, shotId, scale }) => {
+    // Fuoco amico disattivato: il server lo rifiuterebbe comunque
+    if (myTeam && targetId !== myId && remotes.teamOf(targetId) === myTeam) return
     net?.hit({ targetId, weapon, shotId, scale })
     if (targetId !== myId) {
       hud.hitmarker()
@@ -138,8 +148,8 @@ function tryPickup() {
 }
 
 // ---------- Rete ----------
-function startGame(nick, char) {
-  net = connect(nick, char, {
+function startGame(nick, char, mode) {
+  net = connect(nick, char, mode, {
     onError: () => {
       document.getElementById('menu').classList.remove('hidden')
       document.getElementById('menu-error').textContent =
@@ -148,14 +158,22 @@ function startGame(nick, char) {
 
     onInit: (data) => {
       myId = data.id
+      myTeam = data.team || null
+      gameMode = data.mode
+      matchEnded = false
       const me = data.players.find(p => p.id === myId)
       player.setPosition(me.pos[0], me.pos[1], me.pos[2])
       hp = me.hp
       for (const p of data.players) if (p.id !== myId) remotes.add(p)
       pickups.init(data.pickups)
       for (const d of data.drops) pickups.addDrop(d)
+      flags.init(data.flags)
+      hud.setMode(data.modeLabel)
+      hud.setClock(data.timeLeft)
+      hud.setTeamScores(data.teamScores, myTeam)
       hud.setScores(data.scores, myId)
       hud.setHP(hp)
+      if (myTeam) hud.message(`Sei nella squadra dei ${TEAM_LABELS[myTeam]}`, 3500)
       hud.show()
       document.getElementById('menu').classList.add('hidden')
       renderer.domElement.requestPointerLock()
@@ -257,6 +275,41 @@ function startGame(nick, char) {
     },
 
     onScores: (list) => hud.setScores(list, myId),
+    onTeamScores: (s) => hud.setTeamScores(s, myTeam),
+    onClock: ({ t }) => hud.setClock(t),
+
+    onFlag: (f) => {
+      flags.set(f)
+      if (f.state === 'carried' && f.carrier === myId) {
+        hud.message('🚩 Hai la bandiera! Portala alla tua base', 3000)
+        audio.pickup()
+      }
+    },
+    onFlagScored: ({ team, by, nick }) => {
+      hud.message(`🚩 ${by === myId ? 'Hai catturato' : nick + ' ha catturato'} la bandiera!`, 3000)
+      audio.pickup()
+    },
+
+    onMatchEnd: ({ winner }) => {
+      matchEnded = true
+      weapons.triggerDown = false
+      if (winner?.team) {
+        hud.matchEnd(`Vincono i ${TEAM_LABELS[winner.team]}!`, winner.team === 'a' ? '#6fb3ff' : '#ff8a80')
+      } else if (winner) {
+        hud.matchEnd(winner.id === myId ? '🏆 Hai vinto!' : `Vince ${winner.nick}!`, '#ffd54f')
+      } else {
+        hud.matchEnd('Pareggio!', '#fff')
+      }
+    },
+    onMatchStart: ({ timeLeft, teamScores, flags: flagList }) => {
+      matchEnded = false
+      hud.matchEndHide()
+      hud.setClock(timeLeft)
+      hud.setTeamScores(teamScores, myTeam)
+      pickups.resetAll()
+      flags.init(flagList)
+      hud.message('Nuova partita!', 2000)
+    },
   })
 }
 
@@ -264,25 +317,106 @@ function startGame(nick, char) {
 const nickInput = document.getElementById('nick')
 nickInput.value = localStorage.getItem('ow-nick') || ''
 
-// Selettore del personaggio
-let selectedChar = localStorage.getItem('ow-char')
-if (!isCharacter(selectedChar)) selectedChar = DEFAULT_CHARACTER
-const charsEl = document.getElementById('chars')
-for (const [id, def] of Object.entries(CHARACTERS)) {
-  const card = document.createElement('div')
-  card.className = 'char-card'
-  card.dataset.char = id
-  card.innerHTML = `<div class="swatch" style="background:${def.css};box-shadow:inset 0 -8px 0 ${def.cssAccent}"></div>${def.label}`
-  card.addEventListener('click', () => selectChar(id))
-  charsEl.appendChild(card)
-}
+// Selettore del personaggio: la lista arriva dal server e i modelli GLB
+// vengono caricati prima di mostrare il menu (schermata di loading con il
+// bottone "Entra in ufficio"). Il menu ha due pagine: personaggio → modalità.
+const menuEl = document.getElementById('menu')
+const screenChar = document.getElementById('screen-char')
+const screenMode = document.getElementById('screen-mode')
+let selectedChar = null
+let preview = null
+
 function selectChar(id) {
   selectedChar = id
   localStorage.setItem('ow-char', id)
-  for (const c of charsEl.children) c.classList.toggle('selected', c.dataset.char === id)
-  document.getElementById('char-desc').textContent = CHARACTERS[id].desc
+  document.getElementById('char-name').textContent = charLabel(id)
+  preview?.show(id)
 }
-selectChar(selectedChar)
+function cycleChar(dir) {
+  const list = characters()
+  const i = (list.indexOf(selectedChar) + dir + list.length) % list.length
+  selectChar(list[i])
+}
+document.getElementById('char-prev').addEventListener('click', () => cycleChar(-1))
+document.getElementById('char-next').addEventListener('click', () => cycleChar(1))
+
+async function boot() {
+  const loadingEl = document.getElementById('loading')
+  const loadFill = document.getElementById('load-fill')
+  const loadText = document.getElementById('load-text')
+  const ids = await fetchCharacterList()
+  await loadCharacters(ids, (frac, text) => {
+    loadFill.style.width = `${Math.round(frac * 100)}%`
+    loadText.textContent = text
+  })
+  if (characters().length === 0) {
+    loadText.textContent = 'Nessun modello caricato: il server è avviato?'
+    return
+  }
+  preview = new CharacterPreview(document.getElementById('char-preview'))
+  const saved = localStorage.getItem('ow-char')
+  selectChar(isCharacter(saved) ? saved : defaultCharacter())
+  // Asset pronti: si resta sul banner finché non si entra in ufficio
+  document.getElementById('load-bar').classList.add('hidden')
+  loadText.classList.add('hidden')
+  document.getElementById('enter-office').classList.remove('hidden')
+  document.getElementById('enter-office').addEventListener('click', () => {
+    loadingEl.classList.add('fade-out')
+    setTimeout(() => loadingEl.remove(), 700)
+  })
+}
+boot()
+
+// Selettore della modalità di gioco (per ora solo deathmatch)
+const MODE_LABELS = { dm: 'Deathmatch', tdm: 'Team Deathmatch', ctf: 'Capture the Flag' }
+const ENABLED_MODES = ['dm']
+let selectedMode = localStorage.getItem('ow-mode')
+if (!ENABLED_MODES.includes(selectedMode)) selectedMode = 'dm'
+const modesEl = document.getElementById('modes')
+for (const [id, label] of Object.entries(MODE_LABELS)) {
+  const card = document.createElement('div')
+  const enabled = ENABLED_MODES.includes(id)
+  card.className = 'mode-card' + (enabled ? '' : ' disabled')
+  card.dataset.mode = id
+  card.innerHTML = enabled
+    ? `${label}<span class="mode-count" id="mode-count-${id}"></span>`
+    : `${label}<span class="mode-count">in arrivo</span>`
+  if (enabled) card.addEventListener('click', () => selectMode(id))
+  modesEl.appendChild(card)
+}
+function selectMode(id) {
+  selectedMode = id
+  localStorage.setItem('ow-mode', id)
+  for (const c of modesEl.children) c.classList.toggle('selected', c.dataset.mode === id)
+}
+selectMode(selectedMode)
+
+// Navigazione tra le due pagine del menu
+function goToModes() {
+  const nick = nickInput.value.trim()
+  if (!nick) {
+    document.getElementById('char-error').textContent = 'Inserisci un nickname'
+    return
+  }
+  document.getElementById('char-error').textContent = ''
+  localStorage.setItem('ow-nick', nick)
+  screenChar.classList.add('hidden')
+  screenMode.classList.remove('hidden')
+}
+document.getElementById('to-modes').addEventListener('click', goToModes)
+document.getElementById('back-to-char').addEventListener('click', () => {
+  screenMode.classList.add('hidden')
+  screenChar.classList.remove('hidden')
+})
+fetch(`${serverUrl()}/info`)
+  .then(r => r.json())
+  .then(info => {
+    for (const [id, g] of Object.entries(info)) {
+      const el = document.getElementById(`mode-count-${id}`)
+      if (el) el.textContent = g.players === 1 ? '1 in gioco' : `${g.players} in gioco`
+    }
+  })
+  .catch(() => {})
 
 // Leaderboard persistente (migliori di sempre)
 fetch(`${serverUrl()}/leaderboard`)
@@ -299,18 +433,14 @@ function escapeText(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
 }
 
-function submitNick() {
+document.getElementById('play').addEventListener('click', () => {
+  if (!selectedChar) return // modelli non ancora caricati
   const nick = nickInput.value.trim()
-  if (!nick) {
-    document.getElementById('menu-error').textContent = 'Inserisci un nickname'
-    return
-  }
-  localStorage.setItem('ow-nick', nick)
+  if (!nick) return
   document.getElementById('menu-error').textContent = ''
-  startGame(nick, selectedChar)
-}
-document.getElementById('play').addEventListener('click', submitNick)
-nickInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitNick() })
+  startGame(nick, selectedChar, selectedMode)
+})
+nickInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') goToModes() })
 
 // ---------- Loop di gioco ----------
 let lastT = performance.now()
@@ -320,6 +450,9 @@ function loop(now) {
   const dt = Math.min(0.05, (now - lastT) / 1000)
   lastT = now
 
+  // Anteprima del personaggio finché il menu è visibile
+  if (!menuEl.classList.contains('hidden')) preview?.update(dt)
+
   if (net) {
     player.update(dt, locked && !dead ? keys : {}, yaw)
     world.physics.step(1 / 60, dt, 3)
@@ -328,11 +461,12 @@ function loop(now) {
     camera.position.set(player.position.x, player.eyeY, player.position.z)
     camera.quaternion.setFromEuler(new THREE.Euler(pitch, yaw, 0, 'YXZ'))
 
-    weapons.update(dt, locked && !dead)
+    weapons.update(dt, locked && !dead && !matchEnded)
     projectiles.update(dt)
     remotes.update(dt)
     pickups.update(dt)
-    minimap.update(player.position, yaw, remotes)
+    flags.update(dt, remotes, myId, player.position)
+    minimap.update(player.position, yaw, remotes, { myTeam, flags: gameMode === 'ctf' ? flags : null })
     audio.updateListener(player.position.x, player.eyeY, player.position.z, yaw)
 
     // Passi del giocatore locale

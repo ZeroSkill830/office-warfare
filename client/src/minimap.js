@@ -25,11 +25,11 @@ export class Minimap {
     off.height = this.canvas.height
     const ctx = off.getContext('2d')
 
-    ctx.fillStyle = 'rgba(10, 16, 26, 0.82)'
+    ctx.fillStyle = 'rgba(12, 16, 8, 0.84)'
     ctx.fillRect(0, 0, off.width, off.height)
 
     // Muri: corpi statici a forma di box abbastanza alti da non essere arredi
-    ctx.fillStyle = '#5e779c'
+    ctx.fillStyle = '#74815a'
     for (const body of physics.bodies) {
       if (body.mass !== 0) continue
       const shape = body.shapes[0]
@@ -49,16 +49,25 @@ export class Minimap {
   }
 
   // pos = posizione del giocatore locale, yaw = direzione di vista,
-  // remotes = istanza di Remotes (per i punti degli avversari)
-  update(pos, yaw, remotes) {
+  // remotes = istanza di Remotes; opts = { myTeam, flags } per le modalità a squadre
+  update(pos, yaw, remotes, { myTeam = null, flags = null } = {}) {
     const ctx = this.ctx
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
     ctx.drawImage(this.base, 0, 0)
 
-    // Avversari vivi: punti rossi
-    ctx.fillStyle = '#ff5252'
+    // Bandiere CTF: quadrati colorati per squadra
+    if (flags) {
+      for (const f of flags.map.values()) {
+        const [x, y] = this._toPx(f.mesh.position.x, f.mesh.position.z)
+        ctx.fillStyle = f === flags.map.get('a') ? '#6fb3ff' : '#ff8a80'
+        ctx.fillRect(x - 3.5, y - 3.5, 7, 7)
+      }
+    }
+
+    // Altri giocatori vivi: compagni verdi, avversari rossi
     for (const a of remotes.map.values()) {
       if (!a.alive) continue
+      ctx.fillStyle = myTeam && a.team === myTeam ? '#4ade80' : '#ff5252'
       const [x, y] = this._toPx(a.group.position.x, a.group.position.z)
       ctx.beginPath()
       ctx.arc(x, y, 3.2, 0, Math.PI * 2)
@@ -70,7 +79,7 @@ export class Minimap {
     ctx.save()
     ctx.translate(px, py)
     ctx.rotate(-yaw)
-    ctx.fillStyle = '#6fb3ff'
+    ctx.fillStyle = '#d3ec6a'
     ctx.beginPath()
     ctx.moveTo(0, -6)
     ctx.lineTo(4.5, 5)

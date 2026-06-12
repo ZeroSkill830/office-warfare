@@ -22,7 +22,12 @@ try {
   await Promise.all([once(a, 'connect'), once(b, 'connect')])
   check('Due client connessi simultaneamente', true)
 
-  a.emit('join', { nick: 'Alice', char: 'manager' })
+  // I personaggi validi vengono scansionati dal server (cartelle dei modelli)
+  const charList = await (await fetch(URL + '/characters')).json()
+  check('GET /characters elenca i personaggi disponibili', Array.isArray(charList) && charList.length > 0)
+  const charA = charList[charList.length - 1]
+
+  a.emit('join', { nick: 'Alice', char: charA })
   const initA = await once(a, 'init')
   check('Client A riceve init con pickups e spawn', initA.pickups.length > 0 && Array.isArray(initA.players))
 
@@ -33,7 +38,7 @@ try {
   check('Client A vede entrare Bob', joined.nick === 'Bob')
   check('Client B vede Alice in partita', initB.players.some(p => p.nick === 'Alice'))
   check('Personaggio propagato (e char non valido sostituito)',
-    initB.players.find(p => p.nick === 'Alice')?.char === 'manager' && joined.char === 'impiegato')
+    initB.players.find(p => p.nick === 'Alice')?.char === charA && joined.char === charList[0])
 
   // Stato sincronizzato a 20 Hz
   a.emit('state', { p: [1, 1, 1], r: [0, 0], w: 'mouse' })

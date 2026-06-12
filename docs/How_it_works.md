@@ -6,7 +6,9 @@ Documento tecnico per chi riprende in mano il progetto. Aggiornato a giugno 2026
 
 - **Client**: Three.js 0.169 (rendering), cannon-es 0.20 (fisica), Vite (build/dev, porta 5173)
 - **Server**: Node + Express + Socket.io 4.8 (porta 3001)
-- **Zero asset esterni**: tutta la grafica è fatta di primitive Three.js, tutti i suoni
+- **Asset**: i giocatori sono modelli GLB (Avaturn, rig Mixamo) in
+  `client/public/assets/players/<id>/player.glb` con le clip Idle/Shoot/Jump/Death/Run;
+  tutto il resto (mappa, armi, pickup) è fatto di primitive Three.js e tutti i suoni
   sono sintetizzati con WebAudio
 
 ```bash
@@ -18,6 +20,7 @@ npm start        # il server serve anche client/dist (modalità produzione)
 # Test
 node server/index.js &              # serve un server attivo per il test di integrazione
 node server/test-clients.mjs        # 2 client simulati, 15 check (TEST_URL per altra porta)
+node server/test-modes.mjs          # TDM/CTF/fine partita: avvia DA SOLO un server su 3102
 node client/test-smoke.mjs          # fisica in Node senza DOM: mappa, player, proiettili
 ```
 
@@ -53,19 +56,42 @@ colpi (`hit`), ma il server li valida prima di applicare danno:
 ## File per file
 
 ### server/
-- **data.js** — tabella armi (danni/pallini), posizioni di `PICKUPS` (id w1-w8 armi,
+- **data.js** — tabella armi (danni/pallini), `MODES` (label + scoreLimit + timeLimit),
+  `FLAG_BASES` (CTF, a=[0,0,-20.5] b=[0,0,20.5]), posizioni di `PICKUPS` (id w1-w8 armi,
   a1-a4 munizioni, m1-m4 medikit) e `SPAWN_POINTS`. Le coordinate dei pickup DEVONO
   combaciare con la mappa del client (`world.js`).
-- **index.js** — tutto il server: join/state/shoot/hit/pickup/pickupDrop/dropWeapon/
-  disconnect, leaderboard persistente (`leaderboard.json`, override con env `LB_FILE`),
-  endpoint `GET /leaderboard`, static serving di `client/dist`, broadcast a 20 Hz.
-  Whitelist dei personaggi in `CHARACTERS`.
+- **index.js** — classe **`Game`**: una istanza per modalità (dm/tdm/ctf) = una stanza
+  Socket.io (`socket.join(mode)`, `socket.data.game` instrada gli eventi). Ogni Game ha
+  i propri players/pickups/drops/teamScores/flags e il ciclo di partita:
+  - `checkWin()` (limite punteggio) + `tickClock()` 1 Hz (limite tempo) → `endMatch()` →
+    intermission (env `INTERMISSION_MS`, default 8 s) → `resetMatch()` (azzera tutto,
+    respawna tutti, riattiva i pickup)
+  - squadre: `pickTeam()` assegna alla più piccola; `pickSpawn(team)` filtra gli spawn
+    nella propria metà campo (a: z<0); fuoco amico rifiutato in `onHit`
+  - CTF: `tickFlags()` a 20 Hz controlla le distanze (FLAG_RADIUS 1.8): presa della
+    bandiera nemica (base o a terra), recupero della propria caduta, cattura alla
+    propria base SOLO se la propria bandiera è al suo posto; drop su morte/disconnect,
+    ritorno automatico dopo `FLAG_RETURN_MS` (25 s)
+  - env per i test: `SCORE_LIMIT`, `TIME_LIMIT`, `INTERMISSION_MS`, `LB_FILE`, `PORT`
+  - endpoint: `GET /leaderboard` (persistente, globale), `GET /info` (giocatori per
+    stanza), `GET /characters` (personaggi disponibili)
+  - personaggi: `CHARACTERS` è generata all'avvio scansionando le cartelle di
+    `client/public/assets/players` che contengono un `player.glb` (il nome della
+    cartella è l'id; aggiungere un personaggio = aggiungere una cartella, niente
+    codice). Char non valido → primo della lista. Static serving di `client/dist`.
 
 ### client/src/
-- **main.js** — entry point e collante: input, game loop, tutti gli handler di rete,
-  menu (nickname + selezione personaggio + leaderboard). Il loop: player.update →
-  physics.step → world.sync → camera → weapons/projectiles/remotes/pickups/minimap →
-  invio stato ogni 66 ms.
+- **main.js** — entry point e collante: input, game loop, tutti gli handler di rete.
+  Flusso del menu in tre pagine: (1) banner (`assets/banner.png`) con barra di
+  caricamento che al termine diventa il bottone "Entra in ufficio"; (2) selezione
+  personaggio split-screen — anteprima 3D a tutta altezza a sinistra
+  (`CharacterPreview`, aggiornata nel loop finché il menu è visibile), frecce di
+  navigazione + nickname a destra; (3) scelta modalità (+ leaderboard e controlli).
+  `ENABLED_MODES` limita le modalità selezionabili (oggi solo `dm`; tdm/ctf esistono
+  sul server ma le card sono disabilitate "in arrivo").
+  Stato partita: `gameMode`, `myTeam`, `matchEnded` (blocca lo sparo nell'intermezzo).
+  Il loop: player.update → physics.step → world.sync → camera → weapons/projectiles/
+  remotes/pickups/flags/minimap → invio stato ogni 66 ms.
 - **world.js** — mappa ufficio e fisica. Esporta `GROUP` (collision filter: WORLD=1,
   PLAYER=2, PROP=4, DEBRIS=8) e `createWorld(scene)` → `{ physics, props, bounceMat,
   sync }`. Corridoio x∈[-3,3] z∈[-22,22], 8 stanze con porte (gap nei muri) a
@@ -89,29 +115,43 @@ colpi (`hit`), ma il server li valida prima di applicare danno:
   la granata (tproll) è invece un vero corpo rigido con `bounceMat` (restituzione
   0.55) e miccia 1.8 s. `_explode` fa danno ad area con `scale = 1−d/raggio` e
   impulsi radiali sui corpi dinamici. `onExplosion(pos)` riceve la posizione.
-- **remotes.js** — avatar remoti: gambe/braccia separate con pivot (geometrie
-  traslate) per le animazioni procedurali (camminata da velocità stimata, posa
-  aerea, rinculo via `onShot(id)`); nameplate canvas con nome + barra vita
-  (`setHP`); palette e accessori dal personaggio (`characters.js`); `getTargets()`
-  espone gli AABB per la hit detection; callback `onStep(pos)` per i passi udibili.
-- **characters.js** — definizioni dei 4 personaggi (impiegato/manager/sistemista/
-  stagista): colori + `addAccessories()` (cravatta, occhiali, cuffie, cappellino).
-  Riferimenti avatar: testa y=1.6, busto y=1.05, fronte = -z.
+- **remotes.js** — avatar remoti: istanza GLB del personaggio (`models.instantiate`)
+  con macchina a stati delle clip — Idle/Run (timeScale ∝ velocità stimata dal
+  movimento interpolato)/Jump (once, clampata) scelte per frame; Shoot in overlay
+  con timer 0.45 s via `onShot(id)`; Death alla morte (il corpo resta visibile fino
+  al respawn, nameplate e arma nascosti). Nameplate canvas con nome + barra vita
+  (`setHP`); nelle modalità a squadre anello colorato sotto i piedi (`TEAM_COLORS`).
+  L'arma segue la POSIZIONE del bone RightHand ma mantiene l'orientamento dello
+  sguardo (più robusto dell'aggancio diretto al bone). `getTargets()` espone gli
+  AABB per la hit detection; `onStep(pos)` per i passi (accumulatore di fase).
+- **models.js** — caricamento dei personaggi GLB: `fetchCharacterList()` (dal server,
+  con fallback hardcoded se giù), `loadCharacters(ids, onProgress)` (GLTFLoader, un
+  modello fallito = personaggio non disponibile, non blocca), `instantiate(id)` →
+  `{ root, mixer, actions, hand }` (clone con `SkeletonUtils.clone`, obbligatorio per
+  le skinned mesh), `CharacterPreview` (mini-renderer del menu: Idle + turntable).
+  ⚠️ I modelli guardano verso **+z**: `instantiate` li ruota di 180° per la
+  convenzione del gioco (yaw 0 = -z).
 - **pickups.js** — pickup fissi (fluttuano/ruotano, attivati/disattivati dal server)
-  e drop (corpi fisici che cadono). `nearest(pos)` per il prompt "premi E".
+  e drop (corpi fisici che cadono). `nearest(pos)` per il prompt "premi E";
+  `resetAll()` a inizio partita (tutti attivi, drop rimossi).
 - **minimap.js** — pianta generata UNA volta proiettando i corpi statici "alti"
   (halfExtents.y ≥ 0.9 = muri) su canvas; per frame disegna freccia giocatore
-  (yaw 0 = -z = alto) e punti rossi per i nemici vivi.
+  (yaw 0 = -z = alto), nemici rossi, compagni verdi e bandiere CTF (quadrati).
 - **hud.js** — DOM puro: hp, munizioni, slot armi (card con icona), killfeed,
-  classifica, overlay morte (`death(nick)` testo, `deathTimer(s)` countdown —
-  separati apposta, il timer si aggiorna ogni frame).
+  classifica (raggruppata per team nelle modalità a squadre), banner partita
+  (`setMode`/`setClock`/`setTeamScores`), overlay fine match (`matchEnd`/`matchEndHide`),
+  overlay morte (`death(nick)` testo, `deathTimer(s)` countdown — separati apposta,
+  il timer si aggiorna ogni frame).
 - **audio.js** — tutto sintetizzato. Suoni spazializzati: `spatial(pos)` calcola
   volume (1/(1+d²·0.012)) e pan stereo dalla posizione vs listener; il game loop
   chiama `audio.updateListener(x,y,z,yaw)` ogni frame. `startAmbient()` (ronzio
   neon + ventilazione) parte nell'`onInit` (serve il gesto utente per WebAudio).
+- **flags.js** — bandiere CTF: mesh (asta + telo emissivo) e basi (dischi), seguono il
+  portatore in `update()`. Esporta anche `TEAM_COLORS` (a=blu, b=rosso) e `TEAM_LABELS`.
 - **net.js** — `serverUrl()`: porta 5173 (Vite dev) → `<host>:3001`, altrimenti
-  same-origin (produzione: il server serve anche la pagina). `connect(nick, char,
-  handlers)` mappa gli eventi su `on<Evento>`.
+  same-origin (produzione: il server serve anche la pagina). `connect(nick, char, mode,
+  handlers)` mappa gli eventi su `on<Evento>`. Eventi partita: `teamScores`, `clock`,
+  `matchEnd`, `matchStart`, `flag`, `flagScored`.
 
 ## Convenzioni e trappole note
 

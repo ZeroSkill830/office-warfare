@@ -110,6 +110,12 @@ export class Pickups {
     }
   }
 
+  // Nuova partita: tutti i pickup tornano attivi, i drop spariscono
+  resetAll() {
+    for (const id of this.items.keys()) this.setActive(id, true)
+    for (const id of [...this.drops.keys()]) this.removeDrop(id)
+  }
+
   // Pickup o drop più vicino entro il raggio di raccolta
   nearest(pos, radius = 2.2) {
     let best = null, bestD = radius * radius
