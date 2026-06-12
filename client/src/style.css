@@ -60,6 +60,30 @@ h1, h2, .stencil {
   min-width: 170px; text-align: center; font-size: 24px; letter-spacing: 3px; color: #e8eed2;
   font-family: 'Impact', 'Arial Black', sans-serif; text-transform: uppercase;
 }
+#char-desc {
+  max-width: 320px; text-align: center; font-size: 13px; line-height: 1.6;
+  color: #b0bca0; margin: 0;
+}
+#char-stats {
+  display: flex; flex-direction: column; gap: 8px; width: 260px;
+}
+.stat-row {
+  display: flex; align-items: center; gap: 10px;
+}
+.stat-label {
+  width: 80px; font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+  color: #8a9a6a; text-align: right; flex-shrink: 0;
+}
+.stat-bar {
+  flex: 1; height: 6px; background: #1e2a14; border-radius: 3px; overflow: hidden;
+}
+.stat-fill {
+  height: 100%; background: linear-gradient(90deg, #6a8a30, #a8c44d);
+  border-radius: 3px; transition: width .3s ease;
+}
+.stat-val {
+  width: 16px; font-size: 12px; color: #a8c44d; text-align: right; flex-shrink: 0;
+}
 .char-panel #nick { margin-bottom: 0; }
 
 /* ---------- Pagina 2: briefing / seleziona modalità ---------- */

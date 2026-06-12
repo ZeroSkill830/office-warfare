@@ -24,8 +24,44 @@ export function defaultCharacter() {
   return characterIds[0]
 }
 
+const CHARACTER_DATA = {
+  marco: {
+    label: 'Sensei Marco',
+    description: 'Il venditore di punta. Parla troppo, spara ancora di più. Chiude deal e nemici con la stessa energia.',
+    stats: { Anime: 5, Bicicletta: 5, Php: 5 },
+  },
+  michele: {
+    label: 'Don Michele',
+    description: "L'IT specialist. Sa dove sono i cavi e dove fanno più male. Lento ma letale, come un aggiornamento Windows.",
+    stats: { Brace: 5, Mira: 5, Sardelle: 4 },
+  },
+  claudio: {
+    label: 'Sergente Claudio',
+    description: 'Il team leader. Delega i compiti, incassa i crediti e schiva i proiettili con la stessa disinvoltura.',
+    stats: { Saggezza: 5, Esperienza: 5, Resistenza: 4 },
+  },
+  davide: {
+    label: 'Il mago David',
+    description: 'Il contabile. Ogni pallottola ha un costo e lui lo conosce. Efficiente, preciso, spietato.',
+    stats: { Lavoro: 3, Magia: 4, Timidezza: 5 },
+  },
+  pier: {
+    label: 'L\'innominato',
+    description: 'Il nuovo stagista. Non sa ancora bene cosa sta facendo, ma lo fa con molto entusiasmo.',
+    stats: { Pazienza: 1, Bestemmie: 4, Droga : 5 },
+  },
+}
+
 export function labelOf(id) {
-  return id.charAt(0).toUpperCase() + id.slice(1)
+  return CHARACTER_DATA[id]?.label ?? (id.charAt(0).toUpperCase() + id.slice(1))
+}
+
+export function charData(id) {
+  return CHARACTER_DATA[id] ?? {
+    label: labelOf(id),
+    description: 'Un misterioso collega d\'ufficio.',
+    stats: { Velocità: 3, Mira: 3, Resistenza: 3 },
+  }
 }
 
 // Chiede al server quali personaggi esistono; se il server non risponde
@@ -141,7 +177,6 @@ export class CharacterPreview {
   update(dt) {
     if (!this.current) return
     this.current.mixer.update(dt)
-    this.current.root.rotation.y += dt * 0.5
     this.renderer.render(this.scene, this.camera)
   }
 }

@@ -14,7 +14,7 @@ import { connect, serverUrl } from './net.js'
 import { audio } from './audio.js'
 import {
   fetchCharacterList, loadCharacters, characters, isCharacter, defaultCharacter,
-  labelOf as charLabel, CharacterPreview,
+  labelOf as charLabel, charData, CharacterPreview,
 } from './models.js'
 
 // ---------- Rendering di base ----------
@@ -279,7 +279,17 @@ let preview = null
 function selectChar(id) {
   selectedChar = id
   localStorage.setItem('ow-char', id)
-  document.getElementById('char-name').textContent = charLabel(id)
+  const data = charData(id)
+  document.getElementById('char-name').textContent = data.label
+  document.getElementById('char-desc').textContent = data.description
+  const statsEl = document.getElementById('char-stats')
+  statsEl.innerHTML = Object.entries(data.stats).map(([name, val]) =>
+    `<div class="stat-row">
+      <span class="stat-label">${name}</span>
+      <div class="stat-bar"><div class="stat-fill" style="width:${val * 20}%"></div></div>
+      <span class="stat-val">${val}</span>
+    </div>`
+  ).join('')
   preview?.show(id)
 }
 function cycleChar(dir) {
