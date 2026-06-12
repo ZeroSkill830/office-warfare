@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Office Warfare</title>
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <!-- Schermata iniziale -->
+  <div id="menu">
+    <div class="menu-box">
+      <h1>OFFICE&nbsp;WARFARE</h1>
+      <p class="subtitle">Deathmatch in ufficio &mdash; tutti contro tutti</p>
+      <input id="nick" type="text" maxlength="16" placeholder="Il tuo nickname" autocomplete="off" />
+      <div id="chars"></div>
+      <p id="char-desc"></p>
+      <button id="play">ENTRA IN PARTITA</button>
+      <p id="menu-error" class="error"></p>
+      <div class="controls-help">
+        <b>Controlli</b><br/>
+        WASD muovi &middot; Mouse mira &middot; Click sx spara &middot; R ricarica<br/>
+        Spazio salta &middot; E raccogli &middot; 1/2 cambia arma &middot; Tab classifica
+      </div>
+      <div id="menu-leaderboard" class="hidden">
+        <b>🏆 Migliori di sempre</b>
+        <ol id="menu-lb-rows"></ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- HUD -->
+  <div id="hud" class="hidden">
+    <div id="crosshair">+</div>
+    <div id="hitmarker">&#10005;</div>
+
+    <div id="bottom-left">
+      <div id="hp-bar"><div id="hp-fill"></div></div>
+      <div id="hp-num">100</div>
+    </div>
+
+    <div id="bottom-right">
+      <div id="weapon-name">Mouse</div>
+      <div id="ammo">12 / 60</div>
+      <div id="slots"></div>
+    </div>
+
+    <div id="killfeed"></div>
+    <div id="score-mini"></div>
+    <canvas id="minimap"></canvas>
+    <div id="prompt" class="hidden"></div>
+    <div id="msg" class="hidden"></div>
+
+    <div id="death-overlay" class="hidden">
+      <div id="death-text"></div>
+      <div id="death-timer"></div>
+    </div>
+
+    <div id="scoreboard" class="hidden">
+      <h2>CLASSIFICA</h2>
+      <table>
+        <thead><tr><th>Giocatore</th><th>Uccisioni</th><th>Morti</th></tr></thead>
+        <tbody id="score-rows"></tbody>
+      </table>
+    </div>
+
+    <div id="lock-hint" class="hidden">Clicca per riprendere il controllo</div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

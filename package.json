@@ -1,0 +1,18 @@
+{
+  "name": "office-warfare",
+  "version": "1.0.0",
+  "private": true,
+  "description": "FPS multiplayer in stile Call of Duty ambientato in un ufficio, giocabile nel browser",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "setup": "npm install && npm --prefix server install && npm --prefix client install",
+    "dev": "concurrently -n server,client -c blue,green \"npm --prefix server run dev\" \"npm --prefix client run dev\"",
+    "build": "npm --prefix client run build",
+    "start": "node server/index.js"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

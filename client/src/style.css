@@ -1,0 +1,137 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #111; font-family: 'Segoe UI', Arial, sans-serif; }
+canvas { display: block; }
+.hidden { display: none !important; }
+
+/* ---------- Menu ---------- */
+#menu {
+  position: fixed; inset: 0; z-index: 30;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(160deg, #10141c 0%, #1c2738 60%, #0e1118 100%);
+  color: #eee;
+}
+.menu-box { text-align: center; padding: 40px 50px; background: rgba(0,0,0,.45); border: 1px solid #2e4a6b; border-radius: 12px; }
+.menu-box h1 { font-size: 44px; letter-spacing: 6px; color: #6fb3ff; text-shadow: 0 0 18px #1d4d8d; }
+.menu-box .subtitle { margin: 8px 0 26px; color: #9db4cc; }
+#nick {
+  display: block; width: 280px; margin: 0 auto 14px; padding: 12px 14px;
+  font-size: 18px; text-align: center; color: #fff;
+  background: #0d1626; border: 1px solid #3a5a80; border-radius: 6px; outline: none;
+}
+#nick:focus { border-color: #6fb3ff; }
+#chars { display: flex; gap: 10px; justify-content: center; margin-bottom: 6px; }
+.char-card {
+  width: 64px; padding: 8px 4px 6px; cursor: pointer;
+  background: #0d1626; border: 1px solid #3a5a80; border-radius: 8px;
+  text-align: center; color: #9db4cc; font-size: 11px; user-select: none;
+}
+.char-card:hover { border-color: #6fb3ff; }
+.char-card.selected { border-color: #6fb3ff; background: #142d50; color: #fff; box-shadow: 0 0 10px rgba(60,130,255,.35); }
+.char-card .swatch {
+  width: 26px; height: 26px; margin: 0 auto 6px; border-radius: 50%;
+  border: 3px solid transparent;
+}
+.char-card.selected .swatch { border-color: rgba(255,255,255,.7); }
+#char-desc { min-height: 16px; margin-bottom: 12px; font-size: 12px; color: #8aa0b8; font-style: italic; }
+
+#menu-leaderboard { margin-top: 18px; font-size: 13px; color: #9db4cc; }
+#menu-leaderboard b { color: #ffd54f; }
+#menu-leaderboard ol { margin: 8px 0 0; padding-left: 26px; text-align: left; line-height: 1.7; }
+#menu-leaderboard .lb-kills { color: #6fb3ff; font-weight: 700; }
+
+#play {
+  width: 280px; padding: 12px; font-size: 17px; font-weight: 700; letter-spacing: 2px;
+  color: #fff; background: #2563eb; border: none; border-radius: 6px; cursor: pointer;
+}
+#play:hover { background: #3b76f0; }
+.error { color: #ff7070; margin-top: 10px; min-height: 18px; font-size: 14px; }
+.controls-help { margin-top: 26px; font-size: 13px; color: #8aa0b8; line-height: 1.7; }
+
+/* ---------- HUD ---------- */
+#hud { position: fixed; inset: 0; z-index: 20; pointer-events: none; color: #fff; }
+
+#crosshair {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  font-size: 22px; color: rgba(255,255,255,.85); text-shadow: 0 0 4px #000;
+}
+#hitmarker {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  font-size: 26px; color: #ff5252; opacity: 0; transition: opacity .25s;
+}
+
+#bottom-left { position: absolute; left: 24px; bottom: 24px; display: flex; align-items: center; gap: 12px; }
+#hp-bar { width: 220px; height: 16px; background: rgba(0,0,0,.55); border: 1px solid #555; border-radius: 4px; overflow: hidden; }
+#hp-fill { height: 100%; width: 100%; background: linear-gradient(90deg, #2ecc71, #27ae60); transition: width .15s, background .15s; }
+#hp-num { font-size: 24px; font-weight: 700; text-shadow: 0 0 4px #000; }
+
+#bottom-right { position: absolute; right: 24px; bottom: 24px; text-align: right; }
+#weapon-name { font-size: 18px; color: #cfe3ff; text-shadow: 0 0 4px #000; }
+#ammo { font-size: 32px; font-weight: 700; text-shadow: 0 0 5px #000; }
+#ammo.reloading { color: #ffb84d; font-size: 22px; }
+#slots { margin-top: 10px; display: flex; gap: 8px; justify-content: flex-end; }
+#slots .slot {
+  display: flex; align-items: center; gap: 7px; padding: 7px 12px;
+  background: rgba(0,0,0,.55); border: 1px solid #44516a; border-radius: 6px;
+  font-size: 13px; color: #9db4cc;
+}
+#slots .slot.active {
+  border-color: #6fb3ff; color: #fff; background: rgba(20,45,80,.75);
+  box-shadow: 0 0 10px rgba(60,130,255,.4);
+}
+#slots .slot.empty { opacity: .4; font-style: italic; }
+#slots .key {
+  font-weight: 700; color: #6fb3ff; background: rgba(255,255,255,.1);
+  border-radius: 3px; padding: 1px 6px; font-size: 12px;
+}
+#slots .icon { font-size: 19px; line-height: 1; }
+
+#killfeed { position: absolute; top: 16px; right: 16px; text-align: right; font-size: 14px; }
+#killfeed .entry {
+  background: rgba(0,0,0,.55); padding: 4px 10px; margin-bottom: 4px;
+  border-radius: 4px; border-right: 3px solid #e74c3c;
+}
+#killfeed .entry b { color: #6fb3ff; }
+#killfeed .entry .victim { color: #ff8a80; }
+
+#score-mini { position: absolute; top: 16px; left: 16px; background: rgba(0,0,0,.5); padding: 6px 12px; border-radius: 4px; font-size: 14px; }
+
+#minimap {
+  position: absolute; top: 56px; left: 16px;
+  border: 1px solid #2e4a6b; border-radius: 6px;
+  opacity: .88;
+}
+
+#prompt {
+  position: absolute; bottom: 32%; left: 50%; transform: translateX(-50%);
+  background: rgba(0,0,0,.65); padding: 8px 18px; border-radius: 6px;
+  font-size: 16px; border: 1px solid #4d6f96;
+}
+#prompt b { color: #ffd54f; }
+
+#msg {
+  position: absolute; top: 22%; left: 50%; transform: translateX(-50%);
+  font-size: 20px; color: #ffd54f; text-shadow: 0 0 6px #000;
+}
+
+#death-overlay {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; background: rgba(120, 0, 0, .35);
+}
+#death-text { font-size: 34px; font-weight: 700; text-shadow: 0 2px 8px #000; }
+#death-timer { font-size: 20px; margin-top: 12px; color: #ffd0d0; }
+
+#scoreboard {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  background: rgba(8, 14, 24, .92); border: 1px solid #2e4a6b; border-radius: 10px;
+  padding: 22px 34px; min-width: 380px;
+}
+#scoreboard h2 { text-align: center; letter-spacing: 4px; color: #6fb3ff; margin-bottom: 14px; }
+#scoreboard table { width: 100%; border-collapse: collapse; font-size: 15px; }
+#scoreboard th, #scoreboard td { padding: 6px 14px; text-align: left; }
+#scoreboard th { color: #8aa0b8; border-bottom: 1px solid #2e4a6b; }
+#scoreboard tr.me td { color: #ffd54f; }
+
+#lock-hint {
+  position: absolute; top: 60%; left: 50%; transform: translateX(-50%);
+  background: rgba(0,0,0,.7); padding: 10px 22px; border-radius: 6px; font-size: 17px;
+}

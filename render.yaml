@@ -1,0 +1,9 @@
+# Blueprint per il deploy su Render (https://render.com)
+# Il server Node serve sia Socket.io sia la build statica del client.
+services:
+  - type: web
+    name: office-warfare
+    runtime: node
+    plan: free
+    buildCommand: npm run setup && npm run build
+    startCommand: npm start
