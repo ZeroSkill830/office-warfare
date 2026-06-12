@@ -62,6 +62,13 @@ h1, h2, .stencil {
 }
 .char-panel #nick { margin-bottom: 0; }
 
+/* ---------- Pagina 2: briefing / seleziona modalità ---------- */
+#screen-mode {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: #0b0f08 url('/assets/mode-bg.png') center / cover no-repeat;
+}
+
 /* ---------- Schermata di caricamento ---------- */
 #loading {
   position: fixed; inset: 0; z-index: 50;

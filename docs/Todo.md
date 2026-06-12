@@ -44,7 +44,6 @@ Roadmap delle feature, divisa in fasi (vedi `How_it_works.md` per l'architettura
 
 - [ ] Nuove armi e oggetti (il sistema è data-driven: `client/src/weapons.js` + `server/data.js`)
       — idee: tazza di caffè (molotov), fermacarte (cecchino), scotch (rallenta)
-- [ ] I due GLB attuali (pier/davide) sono identici: sostituire `davide/player.glb`
       con il modello vero quando c'è
 - [ ] Modelli custom GLTF anche per armi/mappa (oggi solo i giocatori sono GLB)
 - [ ] Spettatore dopo la morte / kill-cam

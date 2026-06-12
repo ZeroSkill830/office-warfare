@@ -36,7 +36,7 @@ export async function fetchCharacterList() {
     const list = await r.json()
     if (Array.isArray(list) && list.length) return list
   } catch { /* server giù: fallback sotto */ }
-  return ['davide', 'pier']
+  return ['marco','michele','davide', 'pier', 'claudio']
 }
 
 // Carica tutti i GLB. onProgress(frazione 0..1, testo) per la schermata di loading.
